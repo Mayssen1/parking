@@ -1,0 +1,654 @@
+#ifdef HAVE_CONFIG_H
+#  include <config.h>
+#endif
+
+#include <gtk/gtk.h>
+
+#include "callbacks.h"
+#include "interface.h"
+#include "support.h"
+
+
+typedef struct {
+    int id;
+    char nom[50];
+    char prenom[50];
+} Agents;
+
+
+typedef struct {
+    char cin[50];
+} Citoyen;
+
+typedef struct {
+    char jour[50];
+    char mois[50];
+    char annee[50];
+} Date;
+
+void afficher_agents(GtkWidget *liste, const char *filename) {
+    GtkCellRenderer *renderer;
+    GtkTreeViewColumn *column;
+    GtkTreeIter iter;
+    GtkListStore *store;
+    char id[10], nom[32], prenom[32];
+    FILE *f;
+
+    
+    store = gtk_tree_view_get_model(GTK_TREE_VIEW(liste));
+    if (store == NULL) {
+        
+        store = gtk_list_store_new(3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
+
+        
+        renderer = gtk_cell_renderer_text_new();
+        column = gtk_tree_view_column_new_with_attributes("ID", renderer, "text", 0, NULL);
+        gtk_tree_view_append_column(GTK_TREE_VIEW(liste), column);
+
+        renderer = gtk_cell_renderer_text_new();
+        column = gtk_tree_view_column_new_with_attributes("Nom", renderer, "text", 1, NULL);
+        gtk_tree_view_append_column(GTK_TREE_VIEW(liste), column);
+
+        renderer = gtk_cell_renderer_text_new();
+        column = gtk_tree_view_column_new_with_attributes("Prénom", renderer, "text", 2, NULL);
+        gtk_tree_view_append_column(GTK_TREE_VIEW(liste), column);
+    } else {
+        
+        gtk_list_store_clear(store);
+    }
+
+    
+    f = fopen(filename, "r");
+    if (f == NULL) {
+        printf("Erreur lors de l'ouverture du fichier %s\n", filename);
+        return;
+    }
+
+    while (fscanf(f, "%s %s %s", id, nom, prenom) != EOF) {
+        
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, id, 1, nom, 2, prenom, -1);
+    }
+
+    fclose(f);
+
+    
+    gtk_tree_view_set_model(GTK_TREE_VIEW(liste), GTK_TREE_MODEL(store));
+
+    
+    g_object_unref(store);
+}
+
+void
+on_MKbuttonAjouter_clicked             (GtkButton       *button,
+                                        gpointer         user_data)
+{
+GtkWidget *notebook;
+    GtkWidget *label2;
+
+    notebook = lookup_widget(GTK_WIDGET(button), "notebook1");
+    label2 = lookup_widget(GTK_WIDGET(button), "MKlabel2");
+
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 1); 
+    printf("Ajout d'un agent en cours...\n");
+}
+
+
+void
+on_MKbuttonmodifier_clicked            (GtkButton       *button,
+                                        gpointer         user_data)
+{
+GtkWidget *notebook;
+    GtkWidget *label3;
+
+    notebook = lookup_widget(GTK_WIDGET(button), "notebook1");
+    label3 = lookup_widget(GTK_WIDGET(button), "MKlabel3");
+
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 2); 
+    printf("Modification d'un agent en cours...\n");
+}
+
+
+void
+on_MKbuttonsupprimer_clicked           (GtkButton       *button,
+                                        gpointer         user_data)
+{
+GtkWidget *notebook;
+    GtkWidget *label4;
+
+    notebook = lookup_widget(GTK_WIDGET(button), "notebook1");
+    label4 = lookup_widget(GTK_WIDGET(button), "MKlabel4");
+
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 3); 
+    printf("Suppression d'un agent en cours...\n");
+}
+
+void
+on_MKbuttonquitter_clicked            (GtkButton       *button,
+                                        gpointer         user_data)
+{
+GtkWidget *window1;
+
+    
+    window1 = lookup_widget(GTK_WIDGET(button), "window1");
+
+    
+    if (window1 != NULL) {
+        gtk_widget_destroy(window1);  
+        printf("Fermeture de l'application.\n");
+    }
+}
+
+ 
+
+void chercher_et_afficher_agent_par_id(GtkWidget *parent, const char *filename, int id) {
+    FILE *f = fopen(filename, "r");
+    if (f == NULL) {
+        
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
+            GTK_DIALOG_MODAL,
+            GTK_MESSAGE_ERROR,
+            GTK_BUTTONS_OK,
+            "Erreur lors de l'ouverture du fichier %s.", filename);
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        return;
+    }
+
+    Agents agent;
+    int trouve = 0;
+
+    
+    while (fscanf(f, "%d %s %s", &agent.id, agent.nom, agent.prenom) != EOF) {
+        if (agent.id == id) {
+            trouve = 1;
+            break;
+        }
+    }
+
+    fclose(f);
+
+    GtkWidget *dialog;
+    if (trouve) {
+        
+        dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
+            GTK_DIALOG_MODAL,
+            GTK_MESSAGE_INFO,
+            GTK_BUTTONS_OK,
+            "Agent trouvé :\n\nID : %d\nNom : %s\nPrénom : %s",
+            agent.id, agent.nom, agent.prenom);
+    } else {
+        
+        dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
+            GTK_DIALOG_MODAL,
+            GTK_MESSAGE_WARNING,
+            GTK_BUTTONS_OK,
+            "Aucun agent trouvé avec l'ID %d.", id);
+    }
+
+    
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+}
+
+void
+on_MKbuttonchercher_clicked            (GtkButton       *button,
+                                        gpointer         user_data)
+{
+GtkWidget *input_id;
+    int id;
+
+    
+    input_id = lookup_widget(GTK_WIDGET(button), "MKentryids");
+    id = atoi(gtk_entry_get_text(GTK_ENTRY(input_id)));
+
+    
+    chercher_et_afficher_agent_par_id(gtk_widget_get_toplevel(GTK_WIDGET(button)), "agents.txt", id);
+}
+
+int ajouter_agent(const char *filename, Agents agent) {
+    FILE *f = fopen(filename, "a");
+    if (f != NULL) {
+        fprintf(f, "%d %s %s\n", agent.id, agent.nom, agent.prenom);
+        fclose(f);
+        return 1; 
+    } else {
+        return 0; 
+    }
+}
+
+void
+on_MKbuttonajoutera_clicked            (GtkButton       *button,
+                                        gpointer         user_data)
+{
+    GtkWidget *input_nom, *input_prenom,*input_role, *input_id, *radio_actif, *radio_absent;
+    Agents agent;
+
+    input_nom = lookup_widget(GTK_WIDGET(button), "MKentrynom");
+    input_prenom = lookup_widget(GTK_WIDGET(button), "MKentryprenom");
+    input_role = lookup_widget(GTK_WIDGET(button), "MKentryrole");
+    input_id = lookup_widget(GTK_WIDGET(button), "MKentryID");
+    radio_actif = lookup_widget(GTK_WIDGET(button), "MKradiobutton");
+    radio_absent = lookup_widget(GTK_WIDGET(button), "MKradiobutton1");
+    
+
+    strcpy(agent.nom, gtk_entry_get_text(GTK_ENTRY(input_nom)));
+    strcpy(agent.prenom, gtk_entry_get_text(GTK_ENTRY(input_prenom)));
+    agent.id = atoi(gtk_entry_get_text(GTK_ENTRY(input_id)));
+
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(radio_actif))) {
+        printf("L'agent est actif.\n");
+    } else if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(radio_absent))) {
+        printf("L'agent est absent.\n");
+    }
+
+    if (ajouter_agent("agents.txt", agent)) {
+        printf("Agent ajouté avec succès.\n");
+    } else {
+        printf("Erreur lors de l'ajout de l'agent.\n");
+    }
+
+GtkWidget *window1;
+    GtkWidget *MKtreeview;
+
+    
+    window1 = lookup_widget(GTK_WIDGET(button), "window1");
+    gtk_widget_destroy(window1);
+
+    
+    window1 = create_window1();
+    gtk_widget_show(window1);
+
+    
+    MKtreeview = lookup_widget(window1, "MKtreeview");
+    afficher_agents(MKtreeview, "agents.txt");
+}
+
+
+void
+on_MKbuttonannulera_clicked            (GtkButton       *button,
+                                        gpointer         user_data)
+{GtkWidget *notebook;
+GtkWidget *input_nom, *input_prenom,*input_role, *input_id, *radio_actif, *radio_absent;
+
+
+    input_nom = lookup_widget(GTK_WIDGET(button), "MKentrynom");
+    input_prenom = lookup_widget(GTK_WIDGET(button), "MKentryprenom");
+    input_role = lookup_widget(GTK_WIDGET(button), "MKentryrole");
+    input_id = lookup_widget(GTK_WIDGET(button), "MKentryID");
+    radio_actif = lookup_widget(GTK_WIDGET(button), "MKradiobutton");
+    radio_absent = lookup_widget(GTK_WIDGET(button), "MKradiobutton1");
+
+    
+    gtk_entry_set_text(GTK_ENTRY(input_nom), "");
+    gtk_entry_set_text(GTK_ENTRY(input_prenom), "");
+    gtk_entry_set_text(GTK_ENTRY(input_role), "");
+    gtk_entry_set_text(GTK_ENTRY(input_id), "");
+
+    
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(radio_actif), FALSE);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(radio_absent), FALSE);
+
+    notebook = lookup_widget(GTK_WIDGET(button), "notebook1");
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 0);
+    printf("Formulaire réinitialisé.\n");
+}
+
+
+void
+on_MKradiobutton1_toggled              (GtkToggleButton *togglebutton,
+                                        gpointer         user_data)
+{
+ if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(togglebutton))) {
+        printf("Le bouton radio 'Absent' est sélectionné.\n");
+    }
+}
+
+
+void
+on_MKradiobutton_toggled               (GtkToggleButton *togglebutton,
+                                        gpointer         user_data)
+{
+ if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(togglebutton))) {
+        printf("Le bouton radio 'Actif' est sélectionné.\n");
+    }
+}
+
+int modifier_agent(const char *filename, int ancien_id, Agents nouv_agent) {
+    int trouve = 0;
+    Agents agent;
+    FILE *f = fopen(filename, "r");
+    FILE *temp = fopen("temp.txt", "w");
+
+    if (f == NULL || temp == NULL) {
+        if (f) fclose(f);
+        if (temp) fclose(temp);
+        return 0; 
+    }
+
+    while (fscanf(f, "%d %s %s", &agent.id, agent.nom, agent.prenom) != EOF) {
+        if (agent.id == ancien_id) {
+            fprintf(temp, "%d %s %s\n", nouv_agent.id, nouv_agent.nom, nouv_agent.prenom); 
+            trouve = 1;
+        } else {
+            fprintf(temp, "%d %s %s\n", agent.id, agent.nom, agent.prenom);
+        }
+    }
+
+    fclose(f);
+    fclose(temp);
+
+    remove(filename);
+    rename("temp.txt", filename);
+    return trouve; 
+}
+
+
+void
+on_MKbuttonmodifierm_clicked           (GtkButton       *button,
+                                        gpointer         user_data)
+{
+GtkWidget *input_nom, *input_prenom, *input_id, *input_ancien_id;
+    Agents nouv_agent;
+    int ancien_id;
+    int resultat;
+
+    
+    input_nom = lookup_widget(GTK_WIDGET(button), "MKentrynomm");
+    input_prenom = lookup_widget(GTK_WIDGET(button), "MKentryprenomm");
+    input_id = lookup_widget(GTK_WIDGET(button), "MKentryID");
+    input_ancien_id = lookup_widget(GTK_WIDGET(button), "MKentryIDm");  
+
+    
+    strcpy(nouv_agent.nom, gtk_entry_get_text(GTK_ENTRY(input_nom)));
+    strcpy(nouv_agent.prenom, gtk_entry_get_text(GTK_ENTRY(input_prenom)));
+    nouv_agent.id = atoi(gtk_entry_get_text(GTK_ENTRY(input_ancien_id)));
+    ancien_id = atoi(gtk_entry_get_text(GTK_ENTRY(input_ancien_id)));
+
+    
+    resultat = modifier_agent("agents.txt", ancien_id, nouv_agent);
+
+    
+    if (resultat) {
+        printf("Agent modifié avec succès.\n");
+    } else {
+        printf("Erreur : l'agent avec l'ID %d n'a pas été trouvé.\n", ancien_id);
+    }
+
+GtkWidget *window1;
+    GtkWidget *MKtreeview;
+
+    
+    window1 = lookup_widget(GTK_WIDGET(button), "window1");
+    gtk_widget_destroy(window1);
+
+    
+    window1 = create_window1();
+    gtk_widget_show(window1);
+
+    
+    MKtreeview = lookup_widget(window1, "MKtreeview");
+    afficher_agents(MKtreeview, "agents.txt");
+}
+
+
+void
+on_MKbuttonannulerm_clicked            (GtkButton       *button,
+                                        gpointer         user_data)
+{GtkWidget *notebook;
+GtkWidget *input_nom, *input_prenom,*input_role, *input_id, *input_ancien_id;
+    GtkWidget *radio_actif, *radio_absent;
+    GtkWidget *checkbox_mission;
+
+    
+    input_nom = lookup_widget(GTK_WIDGET(button), "MKentrynomm");
+    input_prenom = lookup_widget(GTK_WIDGET(button), "MKentryprenomm");
+    input_role = lookup_widget(GTK_WIDGET(button), "MKentryrolem");
+    input_id = lookup_widget(GTK_WIDGET(button), "MKentryIDm");
+    input_ancien_id = lookup_widget(GTK_WIDGET(button), "MKentryID");
+    radio_actif = lookup_widget(GTK_WIDGET(button), "MKradiobutton2");
+    radio_absent = lookup_widget(GTK_WIDGET(button), "MKradiobutton22");
+    checkbox_mission = lookup_widget(GTK_WIDGET(button), "MKcheckbuttonm");
+
+    
+    gtk_entry_set_text(GTK_ENTRY(input_nom), "");
+    gtk_entry_set_text(GTK_ENTRY(input_prenom), "");
+    gtk_entry_set_text(GTK_ENTRY(input_role), "");
+    gtk_entry_set_text(GTK_ENTRY(input_id), "");
+    gtk_entry_set_text(GTK_ENTRY(input_ancien_id), "");
+
+    
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(radio_actif), FALSE);  
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(radio_absent), FALSE); 
+
+    
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkbox_mission), FALSE);  
+
+    
+  
+notebook = lookup_widget(GTK_WIDGET(button), "notebook1");
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 0);
+    printf("Les champs ont été réinitialisés.\n");
+}
+
+
+void
+on_MKradiobutton2_toggled              (GtkToggleButton *togglebutton,
+                                        gpointer         user_data)
+{
+if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(togglebutton))) {
+        printf("Le bouton radio 'Actif' est sélectionné.\n");
+    }
+}
+
+
+void
+on_MKradiobutton22_toggled             (GtkToggleButton *togglebutton,
+                                        gpointer         user_data)
+{
+if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(togglebutton))) {
+        printf("Le bouton radio 'Absent' est sélectionné.\n");
+    }
+}
+
+int supprimer_agent(const char *filename, int id) {
+    int trouve = 0;
+    Agents agent;
+    FILE *f = fopen(filename, "r");
+    FILE *temp = fopen("temp.txt", "w");
+
+    if (f == NULL || temp == NULL) {
+        if (f) fclose(f);
+        if (temp) fclose(temp);
+        return 0; 
+    }
+
+    while (fscanf(f, "%d %s %s", &agent.id, agent.nom, agent.prenom) != EOF) {
+        if (agent.id == id) {
+            trouve = 1;
+        } else {
+            fprintf(temp, "%d %s %s\n", agent.id, agent.nom, agent.prenom);
+        }
+    }
+
+    fclose(f);
+    fclose(temp);
+
+    remove(filename);
+    rename("temp.txt", filename);
+    return trouve; 
+}
+
+void
+on_MKbuttonsupprimers_clicked          (GtkButton       *button,
+                                        gpointer         user_data)
+{
+
+    GtkWidget *input_id = lookup_widget(GTK_WIDGET(button), "MKentryids");
+    const char *id_text = gtk_entry_get_text(GTK_ENTRY(input_id));
+
+    
+    if (strlen(id_text) == 0) {
+        gtk_message_dialog_new(GTK_WINDOW(user_data), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                               "Veuillez entrer un ID valide.");
+        return;
+    }
+
+    int id = atoi(id_text);
+
+    
+    if (id <= 0) {
+        gtk_message_dialog_new(GTK_WINDOW(user_data), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                               "ID invalide.");
+        return;
+    }
+
+    
+    const char *filename = "agents.txt";  
+    int agent_supprime = supprimer_agent(filename, id);
+
+    
+    if (agent_supprime) {
+        printf("Agent supprimé avec succès.\n");
+    } else {
+        printf("Erreur lors de la suppression de l'agent.\n");
+    }
+
+GtkWidget *window1;
+    GtkWidget *MKtreeview;
+
+    
+    window1 = lookup_widget(GTK_WIDGET(button), "window1");
+    gtk_widget_destroy(window1);
+
+    
+    window1 = create_window1();
+    gtk_widget_show(window1);
+
+    
+    MKtreeview = lookup_widget(window1, "MKtreeview");
+    afficher_agents(MKtreeview, "agents.txt");
+}
+
+
+void
+on_MKbuttonannulers_clicked            (GtkButton       *button,
+                                        gpointer         user_data)
+{GtkWidget *notebook;
+
+    GtkWidget *input_nom = lookup_widget(GTK_WIDGET(button), "MKentrynoms");
+    GtkWidget *input_prenom = lookup_widget(GTK_WIDGET(button), "MKentryprenoms");
+    GtkWidget *input_id = lookup_widget(GTK_WIDGET(button), "MKentryids");
+
+    
+    gtk_entry_set_text(GTK_ENTRY(input_nom), "");
+    gtk_entry_set_text(GTK_ENTRY(input_prenom), "");
+    gtk_entry_set_text(GTK_ENTRY(input_id), "");
+
+    notebook = lookup_widget(GTK_WIDGET(button), "notebook1");
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 0);
+    printf("Les champs ont été réinitialisés.\n");
+
+}
+
+
+void
+on_MKcheckbuttona_toggled              (GtkToggleButton *togglebutton,
+                                        gpointer         user_data)
+{
+if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(togglebutton))) {
+        printf("Mission activée.\n");
+    } else {
+        printf("Mission désactivée.\n");
+    }
+}
+
+
+void
+on_MKcheckbuttonm_toggled              (GtkToggleButton *togglebutton,
+                                        gpointer         user_data)
+{
+if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(togglebutton))) {
+        printf("Mission activée.\n");
+    } else {
+        printf("Mission désactivée.\n");
+    }
+}
+
+
+
+
+
+
+void chercher_et_afficher_citoyen_par_date(GtkWidget *parent, Date date, const char *filename) {
+    FILE *f = fopen(filename, "r");
+    if (f == NULL) {
+        
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
+            GTK_DIALOG_MODAL,
+            GTK_MESSAGE_ERROR,
+            GTK_BUTTONS_OK,
+            "Erreur lors de l'ouverture du fichier %s.", filename);
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        return;
+    }
+
+    Citoyen citoyen;
+    Date d;
+    int trouve = 0;
+
+    
+    while (fscanf(f, "%s %s %s %s", citoyen.cin, d.jour, d.mois, d.annee) != EOF) {
+        if (d.jour == d.jour && d.mois == d.mois && d.annee == d.annee) {
+            trouve = 1; 
+            break;
+        
+    }
+    }
+
+    fclose(f);
+
+    
+    GtkWidget *dialog;
+    if (trouve) {
+        dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
+            GTK_DIALOG_MODAL,
+            GTK_MESSAGE_INFO,
+            GTK_BUTTONS_OK,
+            "Citoyen trouvé :\n\nID Citoyen : %s\nDate : %s-%s-%s",
+            citoyen.cin, date.jour, date.mois, date.annee);
+    } else {
+        dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
+            GTK_DIALOG_MODAL,
+            GTK_MESSAGE_WARNING,
+            GTK_BUTTONS_OK,
+            "Aucun citoyen trouvé pour la date %s-%s-%s.",
+            date.jour, date.mois, date.annee);
+    }
+
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+}
+
+void
+on_MKbuttonrechercher_clicked          (GtkButton       *button,
+                                        gpointer         user_data)
+{
+GtkWidget *input_jour, *input_mois, *input_annee;
+    Date date;
+
+    
+    input_jour = lookup_widget(GTK_WIDGET(button), "MKspinbuttonjour");
+    input_mois = lookup_widget(GTK_WIDGET(button), "MKspinbuttonmois");
+    input_annee = lookup_widget(GTK_WIDGET(button), "MKspinbuttonannnee");
+
+    
+    
+    sprintf(date.jour, "%d", gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(input_jour)));
+    sprintf(date.mois, "%d", gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(input_mois)));
+    sprintf(date.annee, "%d", gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(input_annee)));
+
+ 
+    chercher_et_afficher_citoyen_par_date(gtk_widget_get_toplevel(GTK_WIDGET(button)), date, "citoyens.txt");
+}
